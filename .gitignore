@@ -1,0 +1,44 @@
+# ===== 敏感信息（绝不能上传）=====
+.env
+.env.*
+!.env.example
+cookies.txt
+
+# ===== 数据库 / 数据文件 =====
+*.db
+*.sqlite
+*.sqlite3
+knowledgeos_v5_backup.db
+
+# ===== 运行时产物 =====
+uploads/
+chroma_db/
+.easyocr/
+__pycache__/
+*.pyc
+*.pth
+
+# ===== 日志 =====
+*.log
+
+# ===== 虚拟环境 =====
+.venv/
+venv/
+env/
+
+# ===== 前端 =====
+node_modules/
+dist/
+.vite/
+
+# ===== 测试/临时文件 =====
+test_*.pdf
+test_*.png
+test_*.txt
+gen_test_*.py
+_patch_test.txt
+
+# ===== 本地工具（PortableGit / cloudflared 等）=====
+.portable-git/
+cloudflared
+cloudflared.exe

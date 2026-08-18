@@ -1,0 +1,29 @@
+# Screenshots
+
+项目截图占位目录。运行后端 + 前端时，把以下页面的截图保存为 `.png` 文件并提交到这里：
+
+| 推荐文件名 | 对应页面 | 截图命令提示 |
+|---|---|---|
+| `01_home_dashboard.png` | 首页 Dashboard (`frontend/src/pages/Home.jsx`) | 启动后访问 `http://localhost:5173/` |
+| `02_capture_ai_distillation.png` | AI 知识蒸馏生成过程 | 上传一份 PDF，等待 R1 思维链展示 |
+| `03_card_library.png` | 知识空间 / 卡片库 (`KnowledgeSpace.jsx`) | 主页 → 知识空间 Tab |
+| `04_ai_copilot_qa.png` | AI Copilot 知识问答 (`AIAssistant.jsx`) | 在 Copilot 用 kb 模式提问 |
+| `05_review_session.png` | 复习模式 (`Review.jsx`) | 进入复习页选范围 + 模式 |
+| `06_podcast_player.png` | 播客页 (`Podcast.jsx`) | 生成播客后播放界面 |
+| `07_wrong_book.png` | 错题本 (`WrongBook.jsx`) | 复习做错过题目后查看 |
+
+## 截图规范
+
+- 尺寸：建议 1440 × 900 桌面端
+- 格式：PNG（避免压缩失真）
+- **注意打码**：邮箱 / API Key / Cookie / 个人身份信息先模糊再上传
+
+## 截图后怎么用
+
+把图扔进这个目录后，在 `README.md` 里改成：
+
+```markdown
+![Home Dashboard](./screenshots/01_home_dashboard.png)
+```
+
+GitHub Markdown 支持相对路径直接渲染，老板点进仓库就能看见。
