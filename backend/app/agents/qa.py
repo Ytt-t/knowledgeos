@@ -1,13 +1,12 @@
-"""Retriever Agent — V6 RAG 问答，深度结构化输出 + scope 范围过滤
+"""问答 Agent — 基于个人知识库的 RAG 问答
 
-V6 变化：
-1. 回答深度化：删除"结论≤50字/每条≤30字"硬限制，
-   conclusion 改 2-4 句完整段落，key_points 每条带 detail 解释，action_advice 2-4 条数组
-2. 检索增强：top_k 3→6，阈值 0.2→0.15，context 拼装带 detail/key_cases
-3. 调用 smart_json（R1 深度思考 → V3 转 JSON），失败降级纯文本
-4. scope 增加 space 类型（用户自定义知识空间）
+深度结构化输出 + scope 范围过滤：
+1. 回答深度化：conclusion 改 2-4 句完整段落，key_points 每条带 detail 解释，action_advice 2-4 条数组
+2. 检索增强：扩大 top_k、放宽阈值，context 拼装带 detail/key_cases
+3. 调用两段式深度回答（R1 深度思考 → 转 JSON），失败降级纯文本
+4. scope 支持 space 类型（用户自定义知识空间）
 
-PRD V3.0 P0：AI Copilot 三种模式
+AI Copilot 三种模式
 - qa (知识问答)：基于个人知识库回答，引用来源
 - connect (知识连接)：发现不同知识之间的关系
 - learn (学习辅助)：生成学习路线、面试题、实践任务
@@ -25,7 +24,7 @@ from app.services.vector_store import get_store
 
 logger = logging.getLogger(__name__)
 
-# ===== V9 混合检索：关键词通道（中文召回率提升）=====
+# ===== 混合检索：关键词通道（中文召回率提升）=====
 _ASCII_TOKEN_RE = re.compile(r"[A-Za-z0-9_]{2,}")
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]+")
 
@@ -112,9 +111,9 @@ def _keyword_search(
     return scored[:top_k]
 
 
-# ===== 模式定义（PRD V3.0 P0 + V8）=====
-MODE_FREE = "free"        # V8: 自由问答（DeepSeek 原味大脑，知识库自动加分）
-MODE_KB = "kb"            # V8: 知识库问答（严格 RAG）
+# ===== 模式定义 =====
+MODE_FREE = "free"        # 自由问答（DeepSeek 原味大脑，知识库自动加分）
+MODE_KB = "kb"            # 知识库问答（严格 RAG）
 MODE_QA = "qa"            # 兼容旧值（同知识库问答）
 MODE_CONNECT = "connect"  # 知识连接（前端已下线，接口保留）
 MODE_LEARN = "learn"      # 学习辅助（前端已下线，接口保留）
@@ -162,7 +161,7 @@ USER_TEMPLATE = """【知识库资料】
 请基于以上知识库资料深度回答用户问题，严格按 JSON 格式输出。"""
 
 
-# ===== V8 自由问答模式：DeepSeek 原味大脑，知识库自动加分 =====
+# ===== 自由问答模式：DeepSeek 原味大脑，知识库自动加分 =====
 FREE_SYSTEM_PROMPT = f"""你是 AI 助手，具备最聪明的通用大模型能力（深度思考版）。
 
 你的核心定位：
@@ -188,7 +187,7 @@ FREE_USER_TEMPLATE = """【用户问题】
 请深度回答用户问题，严格按 JSON 格式输出。"""
 
 
-# ===== 知识连接模式 Prompt（PRD：发现不同知识之间的关系）=====
+# ===== 知识连接模式 Prompt（发现不同知识之间的关系）=====
 CONNECT_SYSTEM_PROMPT = f"""你是 KnowledgeOS 的知识连接发现 Agent。任务：基于用户已有的多张知识卡片，发现它们之间潜在的关联、对比、互补关系。
 
 你的核心价值：
@@ -216,7 +215,7 @@ CONNECT_USER_TEMPLATE = """【用户问题/关注点】
 请发现这些知识之间的关联关系，严格按 JSON 格式输出。"""
 
 
-# ===== 学习辅助模式 Prompt（PRD：学习路线、面试题、实践任务）=====
+# ===== 学习辅助模式 Prompt（学习路线、面试题、实践任务）=====
 LEARN_SYSTEM_PROMPT = f"""你是 KnowledgeOS 的学习辅助 Agent。任务：基于用户知识库，生成个性化的学习路线、面试题和实践任务。
 
 输出格式（严格遵循 JSON 结构）：
@@ -267,7 +266,7 @@ def _scope_filter_cards(db: Session, scope: Optional[dict]) -> set[int]:
 
 
 def _card_context(card: KnowledgeCard, idx: int) -> str:
-    """把一张卡片拼成检索上下文（V6：带 detail 和案例的完整内容）"""
+    """把一张卡片拼成检索上下文（带 detail 和案例的完整内容）"""
     parts = [f"【资料{idx}】{card.title}"]
 
     if card.one_liner:
@@ -321,9 +320,9 @@ def _card_context(card: KnowledgeCard, idx: int) -> str:
 
 
 async def _chat_free(question: str, on_thinking=None) -> dict:
-    """V8.1 自由问答 = 纯 DeepSeek 原味：
+    """自由问答 = 纯 DeepSeek 原味：
     无 system 提示词限制、不检索知识库、不结构化 JSON、纯文本自由回答。
-    用 R1 深度思考（保留思考过程展示），失败降级 V3。
+    用 R1 深度思考（保留思考过程展示），失败降级轻任务模型。
     """
     thinking_parts: list = []
 
@@ -372,19 +371,19 @@ async def answer(
     mode: str = MODE_FREE,
     on_thinking=None,
 ) -> dict:
-    """基于用户知识库回答问题（V6 深度结构化输出 + PRD 三模式）
+    """基于用户知识库回答问题（深度结构化输出 + 三种模式）
 
     Args:
         scope: {type: "all"|"space"|"domain"|"tags"|"card_ids", value: ...}
-        mode: "qa" | "connect" | "learn" (PRD V3.0 P0)
+        mode: "qa" | "connect" | "learn"
         on_thinking: 可选回调，收到 R1 思维链时触发（AI 思考过程展示）
 
     Returns:
         {
             answer: str (纯文本兼容),
-            structured_answer: dict (V6 结构化),
+            structured_answer: dict (结构化),
             cited_card_ids: list[int],
-            thinking_text: Optional[str]  (V6.1: AI 思考过程)
+            thinking_text: Optional[str]  (AI 思考过程)
         }
     """
     if mode not in VALID_MODES:
@@ -397,7 +396,7 @@ async def answer(
     # 1. scope 过滤出可用卡片集合
     allowed_ids = _scope_filter_cards(db, scope)
 
-    # 2. 混合检索（V9: 向量 + 关键词双通道，中文召回率大幅提升）
+    # 2. 混合检索（向量 + 关键词双通道，中文召回率大幅提升）
     store = get_store()
     merged: dict[int, float] = {}
     for cid, score in store.query(question, top_k=top_k * 3):
@@ -411,7 +410,7 @@ async def answer(
     hits = sorted(merged.items(), key=lambda x: -x[1])[:top_k]
     logger.info(f"RAG 检索: mode={mode}, scope={scope}, hits={len(hits)}")
 
-    # V8.1 自由问答 = 纯 DeepSeek 原味：不检索知识库、无系统限制、纯文本输出
+    # 自由问答 = 纯 DeepSeek 原味：不检索知识库、无系统限制、纯文本输出
     if mode == MODE_FREE:
         return await _chat_free(question, on_thinking)
 
@@ -459,7 +458,7 @@ async def answer(
             "thinking_text": None,
         }
 
-    # 4. 按模式选择 Prompt（PRD V3.0 P0 三模式）
+    # 4. 按模式选择 Prompt（三种模式）
     if mode == MODE_CONNECT:
         sys_prompt, user_tpl = CONNECT_SYSTEM_PROMPT, CONNECT_USER_TEMPLATE
     elif mode == MODE_LEARN:
@@ -518,13 +517,13 @@ async def answer(
 
 
 def _clean_structured(result: dict, source_titles: list) -> dict:
-    """清洗 LLM 返回的结构化结果（V6 深度 schema）"""
+    """清洗 LLM 返回的结构化结果（深度 schema）"""
     # conclusion
     conclusion = str(result.get("conclusion", "")).strip()
     if not conclusion:
         conclusion = "暂无法基于知识库直接回答此问题。"
 
-    # key_points: [{point, detail}]（V6 深度要点）
+    # key_points: [{point, detail}]（深度要点）
     raw_key = result.get("key_points", []) or []
     key_points = []
     for p in raw_key:
@@ -574,7 +573,7 @@ def _clean_structured(result: dict, source_titles: list) -> dict:
     if not extended:
         extended = "建议深入学习相关主题的更多资料。"
 
-    # action_advice（V6: 2-4 条数组）
+    # action_advice（2-4 条数组）
     raw_advice = result.get("action_advice", []) or []
     advice = []
     if isinstance(raw_advice, list):

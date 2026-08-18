@@ -1,11 +1,13 @@
-"""ORM 模型 — V3 对齐 PRD V3.0 / 架构 V2
+"""ORM 模型 — 定义知识系统核心业务表结构
 
-主要变化（相对 V2）：
-- knowledge_cards: 字段大改（title/ai_summary/keywords/domain/tags/is_favorite/is_archived/deleted_at）
-- knowledge_sources: source_type 改 pdf/txt/markdown，status 状态机改 extracting/summarizing/classifying
-- concept_relations: relation_type 枚举化 + similarity_score
-- chat_sessions: 新增 scope_filter
-- 新增 growth_snapshots 表
+核心数据模型覆盖：
+- knowledge_sources: 知识来源（视频/文档/图片，含多模态类型与处理状态）
+- knowledge_cards: 知识卡片（AI 蒸馏后的结构化知识，含分类/标签/学习状态）
+- knowledge_spaces: 用户自定义知识空间
+- wrong_questions / podcast / review_attempts: 学习闭环（错题本/播客/复习记录）
+- chat_sessions / chat_messages: 问答会话与消息
+- concept_relations / embeddings_index: 知识关联与向量索引映射
+- users / growth_snapshots: 账号与成长统计
 """
 from datetime import datetime
 from sqlalchemy import (
@@ -22,7 +24,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     nickname = Column(String(64), nullable=False, default="默认用户")
-    # V8 账号资料
+    # 账号资料
     email = Column(String(128), nullable=True)
     bio = Column(Text, nullable=True)
     signature = Column(String(256), nullable=True)   # 个性签名
@@ -37,7 +39,7 @@ class User(Base):
 
 
 class KnowledgeSource(Base):
-    """知识来源：V4 多模态 — 视频/文档/图片
+    """知识来源：多模态 — 视频/文档/图片
 
     source_type 枚举覆盖三种输入形态：
     - 文档: pdf / docx
@@ -60,17 +62,17 @@ class KnowledgeSource(Base):
     source_url = Column(String(512))
     raw_text = Column(Text)
 
-    # V4 状态机: pending → parsing → (去重检测) → summarizing → classifying → done/failed
-    # V7: duplicate = 命中重复内容，等待用户决策（终态）
+    # 状态机: pending → parsing → (去重检测) → summarizing → classifying → done/failed
+    # duplicate: 命中重复内容，等待用户决策（终态）
     status = Column(
         SAEnum("pending", "parsing", "summarizing", "classifying",
                "done", "failed", "duplicate", name="source_status"),
         default="pending", nullable=False,
     )
     error_message = Column(Text)
-    thinking_text = Column(Text)  # V6.1: R1 思维链节选（捕获流程「思考过程」展示）
+    thinking_text = Column(Text)  # R1 思维链节选（捕获流程「思考过程」展示）
 
-    # V7 去重
+    # 上传去重
     content_md5 = Column(String(32), nullable=True)        # 归一化 raw_text 的 MD5
     duplicate_card_id = Column(Integer, nullable=True)     # 命中的已有卡片 id
     force_create = Column(Boolean, default=False)          # 用户选择「仍然新建」
@@ -83,9 +85,8 @@ class KnowledgeSource(Base):
 
 
 class KnowledgeCard(Base):
-    """知识卡片 V4.1 — Knowledge Card 2.0
+    """知识卡片 — AI 知识蒸馏产出
 
-    V4.1 升级为 AI知识蒸馏：
     - one_liner: 一句话理解核心概念
     - core_points: 核心知识点 [{point, importance: high/medium/low}]
     - knowledge_structure: 知识结构树 {主题: [子主题]}
@@ -95,7 +96,7 @@ class KnowledgeCard(Base):
     - quality_score: AI质量评分 {completeness, coverage, accuracy, total}
     - summary_mode: 总结模式 study/work/research
     - user_feedback: 用户反馈 helpful/inaccurate/null
-    V4 保留字段：
+    兼容字段：
     - ai_summary: JSON {summary, key_points[], structure}（兼容旧卡片）
     """
     __tablename__ = "knowledge_cards"
@@ -109,15 +110,15 @@ class KnowledgeCard(Base):
         SAEnum("video", "document", "image", name="content_type"),
         default="document", nullable=False,
     )
-    ai_summary = Column(JSON)          # V4 兼容: {summary, key_points[], structure}
+    ai_summary = Column(JSON)          # 兼容: {summary, key_points[], structure}
 
-    # === V4.1 Knowledge Card 2.0 新增字段 ===
+    # === 深度蒸馏结构化字段 ===
     one_liner = Column(Text)            # 一句话理解
     core_points = Column(JSON)          # [{point, importance}]
     knowledge_structure = Column(JSON)  # {主题: [子主题]}
-    importance = Column(String(16), default=None)  # V6: 仅用户手动标记 high，AI 不再打标
-    key_cases = Column(JSON)             # V5: [{scenario, application}]
-    next_steps = Column(JSON)            # PRD V3.0 P0: 下一步学习建议 [str]
+    importance = Column(String(16), default=None)  # 仅用户手动标记，AI 不打标
+    key_cases = Column(JSON)             # [{scenario, application}]
+    next_steps = Column(JSON)            # 下一步学习建议 [str]
     misconceptions = Column(JSON)      # [{misconception, correction}]
     quick_test = Column(JSON)           # [{question, answer}]
     quality_score = Column(JSON)       # {completeness, coverage, accuracy, total}
@@ -130,7 +131,7 @@ class KnowledgeCard(Base):
 
     is_favorite = Column(Boolean, default=False)
     is_archived = Column(Boolean, default=False)
-    learning_status = Column(String(16), default="new")  # PRD V3.0: new | learning | mastered
+    learning_status = Column(String(16), default="new")  # new | learning | mastered
     deleted_at = Column(DateTime, nullable=True)  # 软删除
 
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -140,7 +141,7 @@ class KnowledgeCard(Base):
     user = relationship("User", back_populates="cards")
     space = relationship("KnowledgeSpace", back_populates="cards")
 
-    # V6: 用户自定义知识空间（PRD V3.0 取消 AI 强制分类）
+    # 用户自定义知识空间（取消 AI 强制分类）
     # 注意：旧库通过 ALTER TABLE 补列，物理上无 FK 约束（应用层保证），
     # 此处 ForeignKey 仅作 ORM 关联元数据；新库建表时会带上约束。
     space_id = Column(Integer, ForeignKey("knowledge_spaces.id"), nullable=True)
@@ -148,7 +149,7 @@ class KnowledgeCard(Base):
 
 
 class KnowledgeSpace(Base):
-    """V6 用户自定义知识空间（PRD V3.0：取消 AI 强制分类）"""
+    """用户自定义知识空间（取消 AI 强制分类）"""
     __tablename__ = "knowledge_spaces"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -161,7 +162,7 @@ class KnowledgeSpace(Base):
 
 
 class WrongQuestion(Base):
-    """V7 AI 错题本：复习答错的题，按简化遗忘曲线安排重考"""
+    """错题本：复习答错的题，按简化遗忘曲线安排重考"""
     __tablename__ = "wrong_questions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -178,7 +179,7 @@ class WrongQuestion(Base):
 
 
 class Podcast(Base):
-    """V7 AI 学习播客（NotebookLM 式）：两位 AI 主持人对话讲解知识"""
+    """学习播客（NotebookLM 式）：两位 AI 主持人对话讲解知识"""
     __tablename__ = "podcasts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -193,7 +194,7 @@ class Podcast(Base):
 
 
 class ReviewAttempt(Base):
-    """V6 复习记录：真实学习数据（成长页/薄弱点分析共用）"""
+    """复习记录：真实学习数据（成长页/薄弱点分析共用）"""
     __tablename__ = "review_attempts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -208,7 +209,7 @@ class ReviewAttempt(Base):
 
 
 class ConceptRelation(Base):
-    """知识关联（P1 知识图谱）"""
+    """知识关联（知识图谱）"""
     __tablename__ = "concept_relations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -222,7 +223,7 @@ class ConceptRelation(Base):
 
 
 class EmbeddingsIndex(Base):
-    """向量索引映射：实际向量在 faiss，这里存映射（V3 保留，当前用 vector_store 管理）"""
+    """向量索引映射：实际向量在 faiss，这里存映射（当前由 vector_store 管理）"""
     __tablename__ = "embeddings_index"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -231,14 +232,14 @@ class EmbeddingsIndex(Base):
 
 
 class ChatSession(Base):
-    """问答会话，V5 新增 is_favorite / updated_at 支持对话管理"""
+    """问答会话（支持收藏与更新时间，供对话管理）"""
     __tablename__ = "chat_sessions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String(128), default="新会话")
     scope_filter = Column(JSON)  # {type: "all"|"domain"|"tags"|"card_ids", value: ...}
-    is_favorite = Column(Boolean, default=False)  # V5: 收藏对话
+    is_favorite = Column(Boolean, default=False)  # 收藏对话
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -254,8 +255,8 @@ class ChatMessage(Base):
     role = Column(SAEnum("user", "assistant", name="msg_role"), nullable=False)
     content = Column(Text, nullable=False)
     cited_card_ids = Column(JSON)
-    structured_answer = Column(JSON)  # V5: 结构化回答 {conclusion, core_points, source_knowledge, extended_thinking, action_advice}
-    thinking_text = Column(Text)      # V6.1: AI 思考过程（R1 思维链节选）
+    structured_answer = Column(JSON)  # 结构化回答 {conclusion, core_points, source_knowledge, extended_thinking, action_advice}
+    thinking_text = Column(Text)      # AI 思考过程（R1 思维链节选）
     created_at = Column(DateTime, default=datetime.utcnow)
 
     session = relationship("ChatSession", back_populates="messages")

@@ -1,4 +1,4 @@
-"""/api/sources 路由 — V4 双端点：/url（视频链接）+ /file（文件上传）"""
+"""/api/sources 路由 — 双端点：/url（视频链接）+ /file（文件上传）"""
 import logging
 import uuid
 from pathlib import Path
@@ -108,7 +108,7 @@ async def upload_file(
 
 @router.get("/sources/active")
 def list_active_sources(db: Session = Depends(get_db)):
-    """V8: 处理中/待决策的 source —— 前端切回首页时恢复进度条与弹窗
+    """处理中/待决策的 source —— 前端切回首页时恢复进度条与弹窗
     （必须定义在 /sources/{source_id} 之前，否则 active 被当作 source_id）"""
     rows = (
         db.query(KnowledgeSource)
@@ -140,14 +140,14 @@ def get_source(source_id: int, db: Session = Depends(get_db)):
     s = db.query(KnowledgeSource).get(source_id)
     if not s:
         raise HTTPException(404, "source not found")
-    # V6: 返回生成的卡片 id，前端确认保存面板用
+    # 返回生成的卡片 id，前端确认保存面板用
     card = (
         db.query(KnowledgeCard)
         .filter(KnowledgeCard.source_id == source_id, KnowledgeCard.deleted_at.is_(None))
         .order_by(KnowledgeCard.id.asc())
         .first()
     )
-    # V7: 重复内容的已有卡片信息（duplicate 弹窗文案）
+    # 重复内容的已有卡片信息（duplicate 弹窗文案）
     dup_title = None
     if s.duplicate_card_id:
         dup_card = db.query(KnowledgeCard).get(s.duplicate_card_id)
@@ -160,7 +160,7 @@ def get_source(source_id: int, db: Session = Depends(get_db)):
         "status": s.status,
         "error_message": s.error_message,
         "card_id": card.id if card else None,
-        "thinking_text": s.thinking_text,  # V6.1: AI 思考过程（确认面板展示）
+        "thinking_text": s.thinking_text,  # AI 思考过程（确认面板展示）
         "duplicate_card_id": s.duplicate_card_id,
         "duplicate_card_title": dup_title,
         "created_at": s.created_at.isoformat() if s.created_at else None,
@@ -173,7 +173,7 @@ def retry_source(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    """V9: 失败来源重试。有 raw_text 时跳过解析（省一次抓取/OCR），无则重跑全链路。"""
+    """失败来源重试。有 raw_text 时跳过解析（省一次抓取/OCR），无则重跑全链路。"""
     s = db.query(KnowledgeSource).get(source_id)
     if not s:
         raise HTTPException(404, "source not found")
@@ -204,7 +204,7 @@ def continue_source(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    """V7: duplicate 状态下用户决策——仍然新建 / 放弃"""
+    """duplicate 状态下用户决策——仍然新建 / 放弃"""
     s = db.query(KnowledgeSource).get(source_id)
     if not s:
         raise HTTPException(404, "source not found")

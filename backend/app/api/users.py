@@ -1,4 +1,4 @@
-"""API 路由 — V8 账号系统（单用户 user_id=1，本地单机无登录墙）"""
+"""账号系统 API 路由（单用户 user_id=1，本地单机无登录墙）"""
 import hashlib
 import logging
 import os

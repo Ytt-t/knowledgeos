@@ -1,4 +1,4 @@
-"""图片 OCR 服务 — V4 Image Agent
+"""图片 OCR 服务 — Image Agent
 
 用 easyocr（基于 PyTorch）做图片文字识别。
 用 PIL 读取图片再转 numpy，绕过 OpenCV 中文路径问题。

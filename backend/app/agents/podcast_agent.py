@@ -1,4 +1,4 @@
-"""Podcast Agent — V7 AI 学习播客（NotebookLM 式）
+"""Podcast Agent — AI 学习播客（NotebookLM 式）
 
 两位 AI 主持人对话讲解用户的知识：
 - A（女声，好奇求知派）：外行视角提问、生活类比、复述要点

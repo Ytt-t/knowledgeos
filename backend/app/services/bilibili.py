@@ -31,7 +31,7 @@ def extract_bvid(url: str) -> Optional[str]:
 
     支持形态：
       https://www.bilibili.com/video/BV1xx411c7mD
-      https://b23.tv/xxxxx (短链需先跳转，这里 Phase 1 暂不支持)
+      https://b23.tv/xxxxx (短链需先跳转，当前暂不支持)
       https://m.bilibili.com/video/BV1xx411c7mD
     """
     m = re.search(r"BV[0-9A-Za-z]{10}", url)

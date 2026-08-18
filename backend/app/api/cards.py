@@ -1,4 +1,4 @@
-"""API 路由 — V4.1 Card 2.0 + 知识图谱 + V6 知识空间"""
+"""知识卡片相关 API 路由"""
 import logging
 from datetime import datetime
 
@@ -22,9 +22,9 @@ def list_cards(
     tag: str | None = None,
     favorite: bool | None = None,
     archived: bool | None = None,
-    space_id: int | None = None,      # V6: 按知识空间过滤
-    unclassified: bool = False,       # V6: 只看未分类
-    source_id: int | None = None,     # V6: 按来源过滤（确认面板用）
+    space_id: int | None = None,      # 按知识空间过滤
+    unclassified: bool = False,       # 只看未分类
+    source_id: int | None = None,     # 按来源过滤（确认面板用）
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -60,7 +60,7 @@ def get_card(card_id: int, db: Session = Depends(get_db)):
     if not c:
         raise HTTPException(404, "card not found")
 
-    # V4 迭代：关联 source 信息
+    # 关联 source 信息
     source = db.query(KnowledgeSource).filter(
         KnowledgeSource.id == c.source_id
     ).first()
@@ -97,14 +97,14 @@ def update_card(card_id: int, payload: CardUpdate, db: Session = Depends(get_db)
         raise HTTPException(404, "card not found")
 
     data = payload.model_dump(exclude_unset=True)
-    # V6: 卡片从空间移出时清空 AI 建议残留
+    # 卡片从空间移出时清空 AI 建议残留
     if data.get("space_id") is None and "space_id" in data:
         c.suggested_space = None
     for k, v in data.items():
         setattr(c, k, v)
     db.commit(); db.refresh(c)
 
-    # V6: 标题/标签变化时重建向量，保证检索内容不过期
+    # 标题/标签变化时重建向量，保证检索内容不过期
     if any(k in data for k in ("title", "tags")):
         try:
             from app.services.vector_store import get_store
@@ -122,7 +122,7 @@ def update_card(card_id: int, payload: CardUpdate, db: Session = Depends(get_db)
 
 @router.post("/cards/{card_id}/redistill")
 async def redistill_card(card_id: int, db: Session = Depends(get_db)):
-    """V6.3.2: 用最新深度蒸馏重新总结旧卡片（旧卡片是旧格式：无分段/无粗体/无 detail）
+    """用最新深度蒸馏重新总结旧卡片（旧卡片是无分段的旧格式）
 
     取原始文本重新跑 summarize（R1 深度版），更新卡片全部蒸馏字段 + 向量。
     保留用户手动修改过的：title（仅当标题是 AI 生成时可覆盖，这里保守：保留用户当前标题）、
@@ -177,7 +177,7 @@ async def redistill_card(card_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/cards/{card_id}")
 def delete_card(card_id: int, db: Session = Depends(get_db)):
-    """软删除卡片（V6: 同步清理向量索引与知识关联）"""
+    """软删除卡片（同步清理向量索引与知识关联）"""
     c = db.query(KnowledgeCard).filter(
         KnowledgeCard.id == card_id, KnowledgeCard.deleted_at.is_(None),
     ).first()
@@ -262,7 +262,7 @@ def get_knowledge_graph(db: Session = Depends(get_db)):
     return {"nodes": nodes, "edges": edges}
 
 
-# ===== V4.1 Card 2.0: Quality Feedback =====
+# ===== 卡片质量反馈 =====
 class FeedbackPayload(BaseModel):
     feedback: str  # "helpful" | "inaccurate"
 
@@ -285,7 +285,7 @@ def submit_feedback(card_id: int, payload: FeedbackPayload, db: Session = Depend
     return {"ok": True, "card_id": card_id, "feedback": fb}
 
 
-# ===== V4.1 Card 2.0: Quick Test =====
+# ===== 快速测试 =====
 @router.get("/cards/{card_id}/quick-test")
 def get_quick_test(card_id: int, db: Session = Depends(get_db)):
     """获取快速测试题（不含答案，前端作答后再请求答案）"""

@@ -1,9 +1,9 @@
-"""KnowledgeOS V4 Orchestrator — 多模态统一归一化流程
+"""Orchestrator — 多模态统一归一化流程
 
-架构 4.1 决策：Video/Document/Image 三个 Agent 输出统一结构 {raw_text, metadata}
+架构决策：Video/Document/Image 三个 Agent 输出统一结构 {raw_text, metadata}
 下游 Organizer（总结+命名+分类+标签+归档）完全不感知输入形态。
 
-V4 状态机: pending → parsing → summarizing → classifying → done/failed
+处理状态机: pending → parsing → summarizing → classifying → done/failed
 """
 import logging
 from pathlib import Path
@@ -85,11 +85,11 @@ async def _capture_content(db: Session, source: KnowledgeSource) -> dict:
 
 
 async def _run_pipeline(db: Session, source: KnowledgeSource, *, skip_parsing=False, skip_dedup=False):
-    """V4 统一处理链路：parsing → (去重检测) → summarizing → classifying → done"""
+    """统一处理链路：parsing → (去重检测) → summarizing → classifying → done"""
     try:
         # 1. parsing：Content Capture Agent 识别类型 + 解析内容
         if skip_parsing and source.raw_text:
-            # V7: 去重后「仍然新建」的续跑路径，内容已解析过
+            # 去重后「仍然新建」的续跑路径，内容已解析过
             raw_text = source.raw_text
             content_type = SOURCE_TYPE_TO_CONTENT_TYPE.get(source.source_type, "document")
             meta_title = ""
@@ -112,7 +112,7 @@ async def _run_pipeline(db: Session, source: KnowledgeSource, *, skip_parsing=Fa
         if not raw_text.strip():
             raise ValueError("解析到的文本为空，无法生成知识卡片")
 
-        # V7: 去重检测（省 R1 蒸馏费用；命中 → duplicate 终态等待用户决策）
+        # 去重检测（省 R1 蒸馏费用；命中 → duplicate 终态等待用户决策）
         if not skip_dedup and not source.force_create:
             from app.services.dedup import check_duplicate
             dup_card_id = check_duplicate(db, source)
@@ -126,7 +126,7 @@ async def _run_pipeline(db: Session, source: KnowledgeSource, *, skip_parsing=Fa
         _set_status(db, source, "summarizing")
 
         def _on_thinking(thinking: str):
-            """V6.1: 把 R1 思维链节选写入 source，供前端「思考过程」展示。
+            """把 R1 思维链节选写入 source，供前端「思考过程」展示。
             回调永不抛异常（异常会连累 smart_json 降级路径）。"""
             try:
                 source.thinking_text = (thinking or "")[:2000]
@@ -142,7 +142,7 @@ async def _run_pipeline(db: Session, source: KnowledgeSource, *, skip_parsing=Fa
             f"key_points={len(ai_result['key_points'])}"
         )
 
-        # 3. classifying：AI 标签建议 + 空间建议（V6：不再强制分类/归档）
+        # 3. classifying：AI 标签建议 + 空间建议（不再强制分类/归档）
         _set_status(db, source, "classifying")
         space_names = [row[0] for row in db.query(KnowledgeSpace.name).all()]
         org_result = await organize(
@@ -167,11 +167,11 @@ async def _run_pipeline(db: Session, source: KnowledgeSource, *, skip_parsing=Fa
                 "key_points": ai_result["key_points"],
                 "structure": ai_result["structure"],
             },
-            # V4.1 Card 2.0 新字段
+            # 深度蒸馏结构化新字段
             one_liner=ai_result.get("one_liner", ""),
             core_points=ai_result.get("core_points", []),
             knowledge_structure=ai_result.get("knowledge_structure", {}),
-            importance=None,  # V6: AI 不再自动标重要，由用户自己决定
+            importance=None,  # 重要程度由用户自己决定，AI 不打标
             misconceptions=ai_result.get("misconceptions", []),
             quick_test=ai_result.get("quick_test", []),
             quality_score=ai_result.get("quality_score", {}),
@@ -181,15 +181,15 @@ async def _run_pipeline(db: Session, source: KnowledgeSource, *, skip_parsing=Fa
             keywords=ai_result["keywords"],
             domain=org_result["suggested_space"] or "",  # 兼容旧 UI
             tags=org_result["tags"],
-            is_archived=False,  # V6: 取消自动归档
-            # V6: 知识空间 —— 未分类等用户确认，AI 建议暂存 suggested_space
+            is_archived=False,  # 取消自动归档
+            # 知识空间 —— 未分类等用户确认，AI 建议暂存 suggested_space
             space_id=None,
             suggested_space=org_result["suggested_space"],
         )
         db.add(card)
         db.flush()
 
-        # 向量入库（V6: 带 detail 的完整内容，检索质量更高）
+        # 向量入库（带 detail 的完整内容，检索质量更高）
         store = get_store()
         cp_text = "\n".join(
             f"- {p['point']}" + (f"：{p.get('detail', '')}" if p.get('detail') else "")
@@ -203,7 +203,7 @@ async def _run_pipeline(db: Session, source: KnowledgeSource, *, skip_parsing=Fa
             logger.warning(f"card {card.id} 向量入库失败（不影响主流程）: {ve}")
         db.commit()
 
-        # 5. 知识关联发现（P1，V4 保留）
+        # 5. 知识关联发现
         _discover_relations(db, store, [card.id])
 
         _set_status(db, source, "done")
@@ -243,7 +243,7 @@ def _discover_relations(db: Session, store, new_card_ids: list[int]):
             db.add(rel)
             related_count += 1
 
-        # 同空间关联（V6: 基于用户知识空间，替代原 domain 关联）
+        # 同空间关联（基于用户知识空间，替代原 domain 关联）
         if card.space_id:
             same_space_cards = (
                 db.query(KnowledgeCard)
@@ -284,7 +284,7 @@ def _relation_exists(db: Session, a: int, b: int) -> bool:
 
 
 async def run_pipeline(source_id: int, db_factory, *, skip_parsing=False, skip_dedup=False):
-    """异步执行整个 Capture 流程（V7: 幂等护栏 + 去重续跑参数）"""
+    """异步执行整个 Capture 流程（具备幂等护栏，支持去重后续跑）"""
     db = db_factory()
     try:
         source = db.query(KnowledgeSource).get(source_id)

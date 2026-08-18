@@ -1,6 +1,6 @@
-"""/api/review 路由 — V6 自定义复习范围 + AI 生成复习题 + 薄弱点分析 + 复习记录
+"""/api/review 路由 — 自定义复习范围 + AI 生成复习题 + 薄弱点分析 + 复习记录
 
-PRD V3.0 复习范围（scope_type）：
+复习范围（scope_type）：
 - all: 全部知识
 - recent: 最近学习（近 7 天新增）
 - space: 指定知识空间
@@ -13,11 +13,11 @@ PRD V3.0 复习范围（scope_type）：
 - interview: 面试模式（高频考点 + 深度问答）
 - quick: 快速检测（判断/选择为主，快速过一遍）
 
-V6 变化：
+行为说明：
 - question_count 可空：None = 智能题量（按所选卡片数自适应，min(20, max(3, cards*2))）
 - evaluate 落库 review_attempts，成长页用真实数据
-- 新增 GET /review/weak-points
-- 出题/评分走 smart_json（R1 深度思考）
+- 提供 GET /review/weak-points 错题薄弱点分析
+- 出题/评分走两段式深度思考（R1）
 """
 import logging
 from datetime import datetime, timedelta
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 VALID_MODES = {"understand", "apply", "interview", "quick"}
 
-# 模式 → 题型偏好 + 指令（PRD V3.0）
+# 模式 → 题型偏好 + 指令
 # allowed_types: 该模式下允许的题型（硬约束），AI 返回的非法类型会在后处理中被丢弃
 MODE_GUIDE = {
     "understand": {
@@ -68,16 +68,16 @@ MODE_GUIDE = {
 
 
 class ReviewScope(BaseModel):
-    """复习范围选择（V6: question_count 可空 = 智能题量）"""
+    """复习范围选择（question_count 可空 = 智能题量）"""
     scope_type: str = "all"  # all | space | card_ids | recent | weak
     space_id: Optional[int] = None
     card_ids: Optional[list[int]] = None
     question_count: Optional[int] = None  # None = 智能题量
-    mode: str = "understand"  # PRD V3.0: understand | apply | interview | quick
+    mode: str = "understand"  # understand | apply | interview | quick
 
 
 class AnswerSubmit(BaseModel):
-    """提交答案（V7: is_correct 用于错题本收集，开放题为 None 跳过）"""
+    """提交答案（is_correct 用于错题本收集，开放题为 None 跳过）"""
     question: str
     user_answer: str
     correct_answer: str
@@ -86,7 +86,7 @@ class AnswerSubmit(BaseModel):
 
 
 class EvaluatePayload(BaseModel):
-    """V6 评估请求：带模式与范围，用于落库复习记录"""
+    """评估请求：带模式与范围，用于落库复习记录"""
     mode: str = "understand"
     scope: Optional[dict] = None
     submissions: list[AnswerSubmit]
@@ -141,7 +141,7 @@ EVALUATION_PROMPT = """你是 KnowledgeOS 的 AI 评分 Agent。评价用户的�
 
 
 def _resolve_cards(scope: ReviewScope, db: Session) -> list[KnowledgeCard]:
-    """按 scope 解析卡片集合（V6 五范围）"""
+    """按 scope 解析卡片集合（五种范围）"""
     q = db.query(KnowledgeCard).filter(KnowledgeCard.deleted_at.is_(None))
 
     if scope.scope_type == "space" and scope.space_id:
@@ -194,7 +194,7 @@ def _weak_card_ids(db: Session) -> Optional[set]:
 
 
 def _card_context(c: KnowledgeCard) -> str:
-    """卡片内容 → 出题上下文（V6 带 detail）"""
+    """卡片内容 → 出题上下文（含 detail）"""
     parts = [f"【卡片】{c.title} (ID:{c.id})"]
     if c.one_liner:
         parts.append(f"一句话理解：{c.one_liner}")
@@ -224,7 +224,7 @@ def _card_context(c: KnowledgeCard) -> str:
 
 @router.post("/review/questions")
 async def generate_review_questions(scope: ReviewScope, db: Session = Depends(get_db)):
-    """V6: 基于用户选择的范围 + 模式生成 AI 复习题（智能题量）"""
+    """基于用户选择的范围 + 模式生成 AI 复习题（智能题量）"""
     mode = scope.mode if scope.mode in VALID_MODES else "understand"
     guide = MODE_GUIDE[mode]
 
@@ -284,7 +284,7 @@ async def generate_review_questions(scope: ReviewScope, db: Session = Depends(ge
                 break
         return {"questions": questions[:qty]}
 
-    # 清洗结果：丢弃非法题型（PRD V3.0 模式硬约束）+ 透传 LLM 选项（V8）
+    # 清洗结果：丢弃非法题型（受模式硬约束）+ 透传 LLM 选项
     allowed = guide["allowed_types"]
     raw_questions = result.get("questions", []) or []
     questions = []
@@ -305,7 +305,7 @@ async def generate_review_questions(scope: ReviewScope, db: Session = Depends(ge
             "card_title": str(q.get("card_title", "")),
             "difficulty": str(q.get("difficulty", "medium")),
         }
-        # V8: LLM 出的 4 选项（concept/application），校验 answer 在选项中否则兜底
+        # LLM 出的 4 选项（concept/application），校验 answer 在选项中否则兜底
         raw_options = q.get("options") or []
         if qtype in ("concept", "application") and isinstance(raw_options, list) and len(raw_options) >= 2:
             options = [str(o) for o in raw_options][:4]
@@ -317,7 +317,7 @@ async def generate_review_questions(scope: ReviewScope, db: Session = Depends(ge
     return {"questions": questions[:qty]}
 
 
-# V7 错题本：简化遗忘曲线（间隔天数随错题次数递增）
+# 错题本：简化遗忘曲线（间隔天数随错题次数递增）
 WRONG_SCHEDULE = [1, 2, 4, 7]
 
 
@@ -376,7 +376,7 @@ def _simple_correct_count(submissions: list[AnswerSubmit]) -> int:
 
 @router.post("/review/evaluate")
 async def evaluate_answers(payload: EvaluatePayload, db: Session = Depends(get_db)):
-    """V6: AI 评分 + 薄弱点分析 + 落库复习记录"""
+    """AI 评分 + 薄弱点分析 + 落库复习记录"""
     submissions = payload.submissions or []
     if not submissions:
         return {"score": 0, "feedback": "无答题记录", "weak_points": []}
@@ -387,7 +387,7 @@ async def evaluate_answers(payload: EvaluatePayload, db: Session = Depends(get_d
             f"题目{i}：{s.question}\n用户答案：{s.user_answer}\n参考答案：{s.correct_answer}"
         )
 
-    # V7: 错题本同步（本地判定，先于 AI 评分，互不依赖）
+    # 错题本同步（本地判定，先于 AI 评分，互不依赖）
     try:
         _sync_wrong_questions(db, submissions)
     except Exception as e:
@@ -427,7 +427,7 @@ async def evaluate_answers(payload: EvaluatePayload, db: Session = Depends(get_d
             "correct_count": correct_count,
         }
 
-    # V6: 落库复习记录（成长页真实数据来源）
+    # 落库复习记录（成长页真实数据来源）
     try:
         card_ids = [s.card_id for s in submissions if s.card_id]
         attempt = ReviewAttempt(
@@ -452,7 +452,7 @@ async def evaluate_answers(payload: EvaluatePayload, db: Session = Depends(get_d
 
 @router.get("/review/wrong-questions")
 def list_wrong_questions(due_only: bool = False, db: Session = Depends(get_db)):
-    """V7 错题本：全部错题 / 仅到期（due_only=True，按遗忘曲线到期 + 未掌握）"""
+    """错题本：全部错题 / 仅到期（due_only=True，按遗忘曲线到期 + 未掌握）"""
     q = db.query(WrongQuestion).filter(WrongQuestion.mastered == False)  # noqa: E712
     if due_only:
         now = datetime.utcnow()
@@ -511,7 +511,7 @@ class WrongAnswerSubmit(BaseModel):
 
 @router.post("/review/wrong-questions/{wrong_id}/submit")
 def submit_wrong_answer(wrong_id: int, payload: WrongAnswerSubmit, db: Session = Depends(get_db)):
-    """V7 错题重考：答对清零掌握；答错次数+1 并重算遗忘曲线间隔"""
+    """错题重考：答对清零掌握；答错次数+1 并重算遗忘曲线间隔"""
     w = db.query(WrongQuestion).get(wrong_id)
     if not w:
         raise HTTPException(404, "wrong question not found")
@@ -535,7 +535,7 @@ def submit_wrong_answer(wrong_id: int, payload: WrongAnswerSubmit, db: Session =
 
 @router.get("/review/weak-points")
 def review_weak_points(db: Session = Depends(get_db)):
-    """V6: 薄弱点汇总（来自真实答题评价）+ 学习状态分布"""
+    """薄弱点汇总（来自真实答题评价）+ 学习状态分布"""
     attempts = (
         db.query(ReviewAttempt)
         .filter(ReviewAttempt.created_at >= datetime.utcnow() - timedelta(days=30))
@@ -584,7 +584,7 @@ def review_domains(db: Session = Depends(get_db)):
 
 @router.get("/review/today")
 def review_today(db: Session = Depends(get_db)):
-    """V6.3 今日复习队列（GitHub 复习产品模式：Anki 今日队列 / Readwise Daily Review）
+    """今日复习队列（GitHub 复习产品模式：Anki 今日队列 / Readwise Daily Review）
 
     排序规则：
     1. 从未复习过 且 learning_status != mastered 的卡片（新知识，最优先）

@@ -1,4 +1,4 @@
-"""V7 上传去重：MD5 精确匹配 + 向量相似度双检测"""
+"""上传去重：MD5 精确匹配 + 向量相似度双检测"""
 import hashlib
 import logging
 import re
@@ -33,7 +33,7 @@ def check_duplicate(db: Session, source: KnowledgeSource) -> Optional[int]:
     md5 = hashlib.md5(norm.encode("utf-8")).hexdigest()
     source.content_md5 = md5
 
-    # 1) MD5 精确匹配（V7 之后创建的 source 才带 content_md5）
+    # 1) MD5 精确匹配（仅带 content_md5 的 source 参与比对）
     dup_source = (
         db.query(KnowledgeSource)
         .filter(

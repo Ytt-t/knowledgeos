@@ -1,4 +1,4 @@
-"""API 路由 — V6 用户自定义知识空间（PRD V3.0：取消 AI 强制分类）"""
+"""知识空间 API 路由（用户自定义，取消 AI 强制分类）"""
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException

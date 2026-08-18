@@ -1,8 +1,6 @@
-"""文件解析服务 — V4 支持 PDF / Word(doc/docx) / 图片(OCR)
+"""文件解析服务 — 支持 PDF / Word(doc/docx) / 图片(OCR)
 
-V4 变化：
-- 去掉 txt/markdown（V4 PRD 只列 PDF/Word/图片）
-- 新增 Word 解析（python-docx）
+- PDF / Word 在此解析提取文本
 - 图片走 Image Agent 的 OCR，不在此处理
 """
 import logging

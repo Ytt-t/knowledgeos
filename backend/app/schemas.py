@@ -1,4 +1,4 @@
-"""Pydantic Schema — V4 多模态"""
+"""Pydantic Schema — 多模态数据模型"""
 from datetime import datetime
 from typing import Literal, Optional, Any
 from pydantic import BaseModel, Field
@@ -39,27 +39,27 @@ class CardOut(BaseModel):
     title: str
     content_type: Optional[str] = "document"
     ai_summary: Optional[Any]
-    # V4.1 Card 2.0 新字段
+    # 深度结构化蒸馏新字段
     one_liner: Optional[str] = None
     core_points: Optional[Any] = None
     knowledge_structure: Optional[Any] = None
-    importance: Optional[str] = None  # V6: AI 不再自动打标，仅用户手动设置
-    space_id: Optional[int] = None    # V6: 用户自定义知识空间
+    importance: Optional[str] = None  # 重要程度由用户手动设置，AI 不打标
+    space_id: Optional[int] = None    # 用户自定义知识空间
     suggested_space: Optional[str] = None
     key_cases: Optional[Any] = None
-    next_steps: Optional[Any] = None  # PRD V3.0 P0: 下一步学习建议 [str]
+    next_steps: Optional[Any] = None  # 下一步学习建议 [str]
     misconceptions: Optional[Any] = None
     quick_test: Optional[Any] = None
     quality_score: Optional[Any] = None
     summary_mode: Optional[str] = "study"
     user_feedback: Optional[str] = None
-    # V4 兼容字段
+    # 历史兼容字段
     keywords: Optional[Any]
     domain: Optional[str]
     tags: Optional[Any]
     is_favorite: bool
     is_archived: bool
-    learning_status: Optional[str] = "new"  # PRD V3.0: new | learning | mastered
+    learning_status: Optional[str] = "new"  # new | learning | mastered
     created_at: datetime
     updated_at: datetime
 
@@ -68,7 +68,7 @@ class CardOut(BaseModel):
 
 
 class CardDetailOut(CardOut):
-    """V4.1 Card 2.0 详情：来源信息 + 关联卡片"""
+    """卡片详情：来源信息 + 关联卡片"""
     related_cards: list[CardOut] = []
     source_platform: Optional[str] = None
     source_url: Optional[str] = None
@@ -82,12 +82,12 @@ class CardUpdate(BaseModel):
     tags: Optional[list[str]] = None
     is_favorite: Optional[bool] = None
     is_archived: Optional[bool] = None
-    learning_status: Optional[str] = None  # PRD V3.0: new | learning | mastered
-    space_id: Optional[int] = None          # V6: 移动到知识空间
-    importance: Optional[str] = None        # V6: 用户手动标重要（None=清除标记）
+    learning_status: Optional[str] = None  # new | learning | mastered
+    space_id: Optional[int] = None          # 移动到知识空间
+    importance: Optional[str] = None        # 用户手动标重要（None=清除标记）
 
 
-# ===== Spaces (V6) =====
+# ===== Spaces =====
 class SpaceCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=64)
     icon: Optional[str] = None
@@ -110,7 +110,7 @@ class ChatSessionCreate(BaseModel):
 
 
 class ChatSessionUpdate(BaseModel):
-    """V5: 对话管理 — 重命名 / 收藏"""
+    """对话管理 — 重命名 / 收藏"""
     title: Optional[str] = None
     is_favorite: Optional[bool] = None
 
@@ -129,7 +129,7 @@ class ChatSessionOut(BaseModel):
 
 class ChatMessageCreate(BaseModel):
     content: str = Field(..., min_length=1)
-    mode: Optional[str] = "qa"  # PRD V3.0 P0: qa | connect | learn
+    mode: Optional[str] = "qa"  # qa | connect | learn
 
 
 class ChatMessageOut(BaseModel):
@@ -137,8 +137,8 @@ class ChatMessageOut(BaseModel):
     role: str
     content: str
     cited_card_ids: Optional[list[int]]
-    structured_answer: Optional[Any] = None  # V5: 结构化回答
-    thinking_text: Optional[str] = None      # V6.1: AI 思考过程
+    structured_answer: Optional[Any] = None  # 结构化回答
+    thinking_text: Optional[str] = None      # AI 思考过程
     created_at: datetime
 
     class Config:

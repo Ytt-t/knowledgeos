@@ -28,8 +28,7 @@ async def lifespan(app: FastAPI):
     init_db()
     _ensure_default_user()
     _recover_interrupted_sources()
-    # V6.3.2: 预热向量库（embedding 模型加载 1-2 分钟，一次性）。
-    # 不预热的话第一次问答/入库时会同步加载阻塞事件循环，表现为"页面没反应"。
+    # 预热向量库：启动时一次性加载 embedding 模型，避免首次使用时同步加载阻塞事件循环
     _prewarm_vector_store()
     yield
 
@@ -45,7 +44,7 @@ def _prewarm_vector_store():
 
 
 def _recover_interrupted_sources():
-    """V6: 启动时把上次中断（如 --reload 杀进程）的 source 置 failed，避免永久卡在处理中
+    """启动时把上次中断（如 --reload 杀进程）的 source 置 failed，避免永久卡在处理中
     （duplicate 是等待用户决策的终态，不参与恢复）"""
     from app.database import SessionLocal
     from app.models.models import KnowledgeSource

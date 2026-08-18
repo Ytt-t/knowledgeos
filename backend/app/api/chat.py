@@ -1,4 +1,4 @@
-"""/api/chat 路由 — V5 结构化回答 + 对话管理"""
+"""/api/chat 路由 — 结构化回答 + 对话管理"""
 import json
 import logging
 
@@ -46,7 +46,7 @@ def list_sessions(db: Session = Depends(get_db)):
 
 @router.patch("/chat/sessions/{session_id}", response_model=ChatSessionOut)
 def update_session(session_id: int, payload: ChatSessionUpdate, db: Session = Depends(get_db)):
-    """V5: 重命名对话 / 收藏对话"""
+    """重命名对话 / 收藏对话"""
     s = db.query(ChatSession).get(session_id)
     if not s:
         raise HTTPException(404, "session not found")
@@ -60,7 +60,7 @@ def update_session(session_id: int, payload: ChatSessionUpdate, db: Session = De
 
 @router.delete("/chat/sessions/{session_id}")
 def delete_session(session_id: int, db: Session = Depends(get_db)):
-    """V5: 删除对话（含所有消息）"""
+    """删除对话（含所有消息）"""
     s = db.query(ChatSession).get(session_id)
     if not s:
         raise HTTPException(404, "session not found")
@@ -71,7 +71,7 @@ def delete_session(session_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/chat/sessions")
 def clear_all_sessions(db: Session = Depends(get_db)):
-    """V5: 清空所有对话历史"""
+    """清空所有对话历史"""
     db.query(ChatSession).delete()
     db.commit()
     return {"ok": True, "cleared": True}
@@ -129,7 +129,7 @@ async def send_message(
     )
     db.add(reply); db.commit(); db.refresh(reply)
 
-    # V6.1: 新会话自动生成标题（跟用户问的内容相关，方便找历史记录）
+    # 新会话自动生成标题（跟用户问的内容相关，方便找历史记录）
     if session.title == "新会话":
         session.title = await _auto_title(payload.content, result.get("answer") or "")
         db.commit()
@@ -137,7 +137,7 @@ async def send_message(
     return reply
 
 
-# ===== V9 流式问答（SSE）=====
+# ===== 流式问答（SSE）=====
 _STREAM_FREE_SYSTEM = (
     "你是 KnowledgeOS 里的 AI 搭子，一个年轻、直接、有点幽默的 AI 助手。\n"
     "说话风格：\n"
@@ -164,7 +164,7 @@ def _sse(obj: dict) -> str:
 
 @router.post("/chat/sessions/{session_id}/stream")
 async def stream_message(session_id: int, payload: ChatMessageCreate):
-    """V9: 流式问答（SSE）。
+    """流式问答（SSE）。
     free = 轻快闲聊（deepseek-chat 流式）
     kb = 知识库问答（混合检索 + 引用，流式输出）
     """
@@ -347,7 +347,7 @@ async def stream_message(session_id: int, payload: ChatMessageCreate):
 
 
 async def _auto_title(question: str, answer_text: str) -> str:
-    """基于用户问题和 AI 回答生成会话标题（V3 轻任务，失败回退截断问题）"""
+    """基于用户问题和 AI 回答生成会话标题（轻任务模型，失败回退截断问题）"""
     from app.core.config import settings
     from app.services.deepseek import chat
     try:

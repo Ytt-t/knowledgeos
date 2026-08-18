@@ -35,19 +35,19 @@ def _run_lightweight_migrations():
     """
     # (table, column, ddl_column_def)
     pending_columns = [
-        # PRD V3.0 P0: 知识蒸馏「下一步学习建议」字段
+        # 知识蒸馏「下一步学习建议」字段
         ("knowledge_cards", "next_steps", "JSON"),
-        # V6: 用户自定义知识空间
+        # 用户自定义知识空间
         ("knowledge_cards", "space_id", "INTEGER"),
         ("knowledge_cards", "suggested_space", "VARCHAR(128)"),
-        # V6.1: AI 思考过程展示
+        # AI 思考过程展示
         ("knowledge_sources", "thinking_text", "TEXT"),
         ("chat_messages", "thinking_text", "TEXT"),
-        # V7: 上传去重
+        # 上传去重
         ("knowledge_sources", "content_md5", "VARCHAR(32)"),
         ("knowledge_sources", "duplicate_card_id", "INTEGER"),
         ("knowledge_sources", "force_create", "BOOLEAN"),
-        # V8: 账号资料
+        # 账号资料
         ("users", "email", "VARCHAR(128)"),
         ("users", "bio", "TEXT"),
         ("users", "signature", "VARCHAR(256)"),
@@ -65,7 +65,7 @@ def _run_lightweight_migrations():
 
     with engine.begin() as conn:
         for table, column, ddl in pending_columns:
-            # 按表逐一检查列（V6.1 修复：之前只查 knowledge_cards，多表时误判）
+            # 按表逐一检查列，避免多表迁移时误判
             if table not in existing_tables:
                 continue
             cols = {c["name"] for c in inspector.get_columns(table)}
@@ -79,7 +79,7 @@ def _run_lightweight_migrations():
 
 
 def _migrate_spaces():
-    """V6：把已有非「其他」domain 转成知识空间并回填 space_id。幂等。
+    """把已有非「其他」domain 转成知识空间并回填 space_id。幂等。
 
     - 「AI技术」这类有效领域 → 建同名空间 + 卡片回填 space_id
     - 「其他」是占位垃圾值 → 保持 space_id=NULL（未分类）

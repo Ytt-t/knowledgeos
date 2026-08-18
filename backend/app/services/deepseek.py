@@ -1,7 +1,7 @@
-"""DeepSeek API 客户端 — V6 双模型
+"""DeepSeek API 客户端 — 双模型
 
-- deepseek-chat (V3)：轻任务 + JSON 模式（response_format）
-- deepseek-reasoner (R1)：深度任务，两段式（R1 深度文本 → V3 转 JSON）
+- deepseek-chat：轻任务 + JSON 模式（response_format）
+- deepseek-reasoner (R1)：深度任务，两段式（R1 深度文本 → chat 转 JSON）
 
 R1 参数契约（官方）：
 - 不支持 temperature / top_p / response_format（传了会 400 或行为异常）
@@ -215,7 +215,7 @@ async def chat_stream(
     max_tokens: Optional[int] = None,
     timeout: Optional[float] = None,
 ) -> AsyncIterator[str]:
-    """V9: 流式调用 DeepSeek Chat Completions，逐段产出 content 增量。
+    """流式调用 DeepSeek Chat Completions，逐段产出 content 增量。
 
     用 deepseek-chat 保证首字快、体验顺；reasoner 的思维链不适合流式对话。
     """
@@ -299,18 +299,18 @@ async def smart_json(
     retries: int = 2,
     on_thinking: Optional[Callable[[str], None]] = None,
 ) -> dict:
-    """V6 两段式智能 JSON：R1 深度思考 → V3 转结构化 JSON
+    """两段式智能 JSON：R1 深度思考 → chat 转结构化 JSON
 
     流程：
     1. R1(reasoner) 对原任务深度分析，输出自然语言长文本
-    2. V3(chat) 把深度分析按原 prompt 的 JSON schema 转译成合法 JSON
-    失败（R1 报错/关闭开关）自动降级为纯 V3 chat_json，链路不断。
+    2. chat 把深度分析按原 prompt 的 JSON schema 转译成合法 JSON
+    失败（R1 报错/关闭开关）自动降级为纯 chat_json，链路不断。
 
     Args:
         messages: 原始任务消息（含 system schema 约束 + user 内容）
         on_thinking: 可选回调，收到 R1 思维链时触发（用于展示 AI 思考过程）
     """
-    # 开关关闭 → 直接 V3
+    # 开关关闭 → 直接走轻任务模型 chat_json
     if not settings.LLM_USE_REASONER:
         return await chat_json(messages, temperature=temperature, max_tokens=output_max_tokens)
 
@@ -328,7 +328,7 @@ async def smart_json(
         if not deep_text.strip():
             raise DeepSeekError("R1 返回空内容")
 
-        # 第二段：V3 把深度分析转成 JSON（schema 沿用原 prompt）
+        # 第二段：用轻任务模型把深度分析转成 JSON（schema 沿用原 prompt）
         msgs2 = list(messages)
         if msgs2 and msgs2[0]["role"] == "system":
             msgs2[0] = {

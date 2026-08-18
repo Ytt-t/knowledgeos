@@ -1,7 +1,6 @@
-"""/api/stats + /api/growth 路由 — V6 真实学习数据
+"""/api/stats + /api/growth 路由 — 真实学习数据
 
-V6 变化：
-- 删除虚假「掌握度」数据源（原按卡片数推断）
+- 统计全部来自真实学习行为，不依据卡片数做推断
 - 新增：复习统计（次数/答题/正确率/连续天数）、空间分布、学习状态分布、复习记录
 """
 from datetime import datetime, timedelta
@@ -31,7 +30,7 @@ def _calc_streak(review_dates: set, card_dates: set) -> int:
 
 @router.get("/growth/overview")
 def growth_overview(db: Session = Depends(get_db)):
-    """首页 + 知识成长中心 共用的统计接口（V6: 真实学习数据）"""
+    """首页 + 知识成长中心 共用的统计接口（真实学习数据）"""
     # 卡片总数（排除软删除）
     total_cards = (
         db.query(func.count(KnowledgeCard.id))
@@ -47,7 +46,7 @@ def growth_overview(db: Session = Depends(get_db)):
     )
     by_type = {t: c for t, c in by_type_rows}
 
-    # V6: 空间分布（替代领域分布）
+    # 空间分布（替代领域分布）
     space_rows = (
         db.query(KnowledgeSpace.name, func.count(KnowledgeCard.id))
         .outerjoin(KnowledgeCard, KnowledgeCard.space_id == KnowledgeSpace.id)
@@ -56,7 +55,7 @@ def growth_overview(db: Session = Depends(get_db)):
     )
     space_distribution = {name: cnt for name, cnt in space_rows}
 
-    # V6: 学习状态分布（用户手动标记，非 AI 推断）
+    # 学习状态分布（用户手动标记，非 AI 推断）
     status_rows = (
         db.query(KnowledgeCard.learning_status, func.count(KnowledgeCard.id))
         .filter(KnowledgeCard.deleted_at.is_(None))
@@ -95,7 +94,7 @@ def growth_overview(db: Session = Depends(get_db)):
         cnt = next((c for d, c in recent_rows if str(d) == day), 0)
         recent_7_days.append({"date": day, "count": cnt})
 
-    # V6: 复习统计（真实学习数据）
+    # 复习统计（真实学习数据）
     review_count = db.query(func.count(ReviewAttempt.id)).scalar() or 0
     total_answered = db.query(func.coalesce(func.sum(ReviewAttempt.total), 0)).scalar() or 0
     total_correct = db.query(func.coalesce(func.sum(ReviewAttempt.correct_count), 0)).scalar() or 0
@@ -142,7 +141,7 @@ def growth_overview(db: Session = Depends(get_db)):
         "recent_7_days": recent_7_days,
         "today_count": recent_7_days[-1]["count"] if recent_7_days else 0,
         "week_count": sum(d["count"] for d in recent_7_days),
-        # V6 复习统计
+        # 复习统计
         "review_count": review_count,
         "total_answered": total_answered,
         "total_correct": total_correct,
@@ -155,7 +154,7 @@ def growth_overview(db: Session = Depends(get_db)):
 
 @router.get("/growth/review-history")
 def review_history(db: Session = Depends(get_db)):
-    """V6: 复习记录列表（成长页用）"""
+    """复习记录列表（成长页用）"""
     attempts = (
         db.query(ReviewAttempt)
         .order_by(ReviewAttempt.created_at.desc())

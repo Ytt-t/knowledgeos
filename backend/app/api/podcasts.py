@@ -1,4 +1,4 @@
-"""API 路由 — V7 AI 学习播客（NotebookLM 式）
+"""AI 学习播客（NotebookLM 式）API 路由
 
 异步生成：POST 建行立即返回 → BackgroundTasks 后台写脚本 + 逐段 TTS → 前端轮询
 """
@@ -59,7 +59,7 @@ async def _generate_podcast(podcast_id: int):
 
         context = "\n\n".join(_card_context(c, i + 1) for i, c in enumerate(cards))
 
-        # 1. 写脚本（R1 深度 → V3 转 JSON）
+        # 1. 写脚本（R1 深度 → 轻任务模型转 JSON）
         result = await generate_script(context)
         p.title = result["title"]
         p.script_json = result["segments"]
@@ -126,7 +126,7 @@ def retry_podcast(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    """V9: 失败播客重试（复用原 scope，重置脚本与音频）"""
+    """失败播客重试（复用原 scope，重置脚本与音频）"""
     p = db.query(Podcast).get(podcast_id)
     if not p:
         raise HTTPException(404, "podcast not found")
@@ -143,7 +143,7 @@ def retry_podcast(
 
 @router.delete("/podcasts/{podcast_id}")
 def delete_podcast(podcast_id: int, db: Session = Depends(get_db)):
-    """V9: 删除播客（含音频目录）"""
+    """删除播客（含音频目录）"""
     p = db.query(Podcast).get(podcast_id)
     if not p:
         raise HTTPException(404, "podcast not found")

@@ -1,22 +1,22 @@
-"""Knowledge Distillation Agent — V6 知识蒸馏（深度版）
+"""Knowledge Distillation Agent — 深度知识蒸馏
 
-V6 变化（对齐 PRD V3.0「重构AI输出质量」）：
+输出规范：
 - summary: 200-400 字完整摘要，讲清「是什么/为什么重要/怎么用/常见坑」
 - core_points: 3-6 条，每条 {point, detail}，detail 是 2-3 句带解释的深度内容
-- 删除顶层 importance 输出 —— 重要性由用户自己决定，AI 不再打标
+- importance 由用户自己决定，AI 不打标
 - next_steps: 2-4 条「具体行动 + 资源方向」，禁止泛泛而谈
-- 调用 smart_json（R1 深度思考 → V3 转 JSON）
+- 调用两段式深度思考（R1 深度思考 → 转 JSON）
 
-输出 Knowledge Card 2.0（对齐 PRD V3.0 五要素）：
+输出知识卡片（五要素）：
 - one_liner: 一句话理解核心概念
 - core_points: 核心知识点 + 详细解释（核心概念）
 - knowledge_structure: 知识结构树
 - key_cases: 实践应用案例
-- next_steps: 下一步学习建议（PRD P0 必备）
+- next_steps: 下一步学习建议
 - misconceptions: 常见误区
 - quick_test: 快速测试题
 - quality_score: AI质量评分
-- 保留 V4 兼容字段: summary, key_points, keywords, structure
+- 兼容字段: summary, key_points, keywords, structure
 """
 import logging
 
@@ -120,13 +120,13 @@ USER_TEMPLATE = """【文件名/标题】{title}
 
 
 async def summarize(text: str, title: str = "", on_thinking=None) -> dict:
-    """Knowledge Distillation Agent — 生成 Card 2.0 全部字段（V6 深度版）
+    """Knowledge Distillation Agent — 生成知识卡片全部字段（深度版）
 
     Args:
         on_thinking: 可选回调，收到 R1 思维链时触发（捕获流程「思考过程」展示）
 
     Returns:
-        dict 包含 Card 2.0 所有字段 + V4 兼容字段
+        dict 包含知识卡片所有字段 + 兼容字段
         importance 恒为 None（重要性由用户自己决定）
     """
     text = (text or "").strip()
@@ -155,7 +155,7 @@ async def summarize(text: str, title: str = "", on_thinking=None) -> dict:
     # schema 兜底 + 清洗
     ai_title = str(result.get("title", "")).strip() or title
 
-    # 清洗 core_points（V6: 带 detail）
+    # 清洗 core_points（带 detail）
     raw_points = result.get("core_points", []) or []
     core_points = []
     for p in raw_points:
@@ -223,14 +223,14 @@ async def summarize(text: str, title: str = "", on_thinking=None) -> dict:
             if text:
                 next_steps.append(text)
 
-    # V6: importance 不再由 AI 输出 —— 用户自己决定
+    # importance 不再由 AI 输出 —— 用户自己决定
     importance = None
 
-    # V4 兼容：从 core_points 提取 key_points
+    # 兼容：从 core_points 提取 key_points
     key_points = [p["point"] for p in core_points]
 
     return {
-        # V4.1 Card 2.0 新字段
+        # 深度蒸馏结构化字段
         "title": ai_title,
         "one_liner": str(result.get("one_liner", "")),
         "core_points": core_points,
@@ -241,7 +241,7 @@ async def summarize(text: str, title: str = "", on_thinking=None) -> dict:
         "misconceptions": misconceptions,
         "quick_test": quick_test,
         "quality_score": quality_score,
-        # V4 兼容字段
+        # 兼容字段
         "summary": str(result.get("summary", "")),
         "key_points": key_points,
         "keywords": result.get("keywords", []) or [],

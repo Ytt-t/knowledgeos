@@ -1,0 +1,20 @@
+# 可选增强依赖 —— 视频解析 / OCR / 语音合成 / 向量检索
+# 按需安装：pip install -r requirements-extras.txt
+# 说明：torch 体积较大，若只需视频/OCR 之外的基础功能可不安装。
+
+# 视频解析（B站/小红书/抖音）：下载 + 无头浏览器取 Cookie + ASR 转写
+yt-dlp
+playwright
+openai-whisper
+imageio-ffmpeg
+
+# OCR 图片文字识别
+easyocr
+
+# 语音合成（TTS）
+edge-tts
+
+# 向量检索与去重（embedding 模型）
+sentence-transformers
+faiss-cpu
+torch

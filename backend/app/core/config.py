@@ -16,10 +16,10 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
 
-    # V6 双模型：R1 深度思考 + V3 轻任务
+    # 双模型：R1 深度思考 + 轻任务
     LLM_CHAT_MODEL: str = "deepseek-chat"          # 轻任务 + JSON 转译
     LLM_REASONER_MODEL: str = "deepseek-reasoner"  # 深度任务（R1）
-    LLM_USE_REASONER: bool = True                  # 开关：False 时全部走 V3
+    LLM_USE_REASONER: bool = True                  # 开关：False 时全部走轻任务模型
     LLM_DISTILL_MAX_TOKENS: int = 16384            # 知识蒸馏 R1 段（含思维链）
     LLM_DISTILL_OUTPUT_MAX_TOKENS: int = 8192      # JSON 转译段
     LLM_QA_MAX_TOKENS: int = 8192
@@ -58,17 +58,17 @@ class Settings(BaseSettings):
     # 文件上传
     UPLOAD_DIR: Path = Path("./uploads")
 
-    # 向量库（Phase 3 用）
+    # 向量库存储目录
     CHROMA_PERSIST_DIR: str = "./chroma_db"
 
     # 轮询相关
     TASK_POLL_INTERVAL_SEC: int = 3
 
-    # V7 去重（MiniLM 余弦相似度，同文通常 0.95+）
+    # 上传去重（MiniLM 余弦相似度，同文通常 0.95+）
     DEDUP_SIM_THRESHOLD: float = 0.92
     DEDUP_TOP_K: int = 3
 
-    # V7 播客
+    # 播客音频目录
     PODCAST_AUDIO_DIR: Path = Path("./uploads/podcast")
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
