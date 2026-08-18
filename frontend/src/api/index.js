@@ -2,9 +2,19 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api',
-  // V6.1: R1 深度思考最长约 5 分钟，120s 超时会误杀长问答
+  // 深度思考最长可能数分钟，避免超时误杀长问答
   timeout: 360000,
 })
+
+// 如果配置了 VITE_API_KEY（与后端 APP_API_KEY 一致），
+// 所有请求自动携带 X-API-Key 请求头，通过后端的访问令牌校验
+const API_KEY = import.meta.env.VITE_API_KEY
+if (API_KEY) {
+  api.interceptors.request.use((config) => {
+    config.headers['X-API-Key'] = API_KEY
+    return config
+  })
+}
 
 // ===== Sources (V4: /url + /file 双端点) =====
 export const submitVideoUrl = (url) =>

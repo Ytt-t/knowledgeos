@@ -83,14 +83,29 @@ app = FastAPI(
     default_response_class=JSONResponse,
 )
 
-# 单端口部署：允许任意 Origin（内网穿透每次域名不同；本地 demo 场景安全性优先放行）
+# CORS：只放行配置的前端来源（默认本地开发地址）。
+# 部署到其它域名时，在 .env 中通过 CORS_ORIGINS 将域名加入白名单。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# 可选访问令牌：在 .env 设置 APP_API_KEY 后，所有 /api 请求必须携带
+# 请求头 X-API-Key（值一致），否则返回 401。用于防止公网下被任意调用
+# 而消耗 DeepSeek 额度。未配置该值时本中间件不生效。
+if settings.APP_API_KEY:
+    @app.middleware("http")
+    async def api_key_guard(request: Request, call_next):
+        expected = settings.APP_API_KEY
+        path = request.url.path
+        is_api = path.startswith("/api") and not path.startswith("/api/health")
+        if is_api and request.headers.get("x-api-key") != expected:
+            return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+        return await call_next(request)
 
 # ===== 接口路由（必须先注册，优先匹配）=====
 app.include_router(sources.router, prefix="/api", tags=["sources"])

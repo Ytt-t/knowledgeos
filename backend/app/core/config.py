@@ -64,9 +64,23 @@ class Settings(BaseSettings):
     # 轮询相关
     TASK_POLL_INTERVAL_SEC: int = 3
 
-    # 上传去重（MiniLM 余弦相似度，同文通常 0.95+）
+    # V7 去重（MiniLM 余弦相似度，同文通常 0.95+）
     DEDUP_SIM_THRESHOLD: float = 0.92
     DEDUP_TOP_K: int = 3
+
+    # ===== 安全加固（可选，配置后生效）=====
+    # API 访问令牌：设置后，所有 /api 请求都必须携带请求头 X-API-Key 且值一致，否则返回 401。
+    # 用于防止接口被公开调用时消耗 DeepSeek 额度（前端需同步配置 VITE_API_KEY）。
+    APP_API_KEY: str = os.getenv("APP_API_KEY", "")
+
+    # 允许跨域访问的前端来源（CORS）。默认只放行本地开发地址；
+    # 若前端部署在其它域名，请把该域名加进来（JSON 数组）。
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
+    ]
 
     # 播客音频目录
     PODCAST_AUDIO_DIR: Path = Path("./uploads/podcast")
